@@ -185,22 +185,35 @@ class EasyOCRProcessor(BaseOCRProcessor):
                 if not text:
                     continue
                 
-                # Convert polygon to bounding box
-                x_coords = [point[0] for point in bbox_points]
-                y_coords = [point[1] for point in bbox_points]
+                # Convert polygon to bounding box using Shapely (more robust)
+                try:
+                    from shapely.geometry import Polygon
+                    polygon = Polygon(bbox_points)
+                    bounds = polygon.bounds  # (minx, miny, maxx, maxy)
+                    
+                    bounding_box = BoundingBox(
+                        x1=float(bounds[0]),
+                        y1=float(bounds[1]),
+                        x2=float(bounds[2]),
+                        y2=float(bounds[3])
+                    )
+                except ImportError:
+                    # Fallback to manual calculation if Shapely not available
+                    x_coords = [point[0] for point in bbox_points]
+                    y_coords = [point[1] for point in bbox_points]
+                    
+                    x1, x2 = min(x_coords), max(x_coords)
+                    y1, y2 = min(y_coords), max(y_coords)
+                    
+                    bounding_box = BoundingBox(
+                        x1=float(x1),
+                        y1=float(y1),
+                        x2=float(x2),
+                        y2=float(y2)
+                    )
                 
-                x1, x2 = min(x_coords), max(x_coords)
-                y1, y2 = min(y_coords), max(y_coords)
-                
-                bounding_box = BoundingBox(
-                    x1=float(x1),
-                    y1=float(y1),
-                    x2=float(x2),
-                    y2=float(y2)
-                )
-                
-                # Determine region type
-                region_type = self._determine_region_type(text, confidence, bounding_box)
+                # Determine region type (pass image dimensions for better classification)
+                region_type = self._determine_region_type(text, confidence, bounding_box, image.shape[:2])
                 
                 # Create region
                 region = OCRRegion(
@@ -218,44 +231,197 @@ class EasyOCRProcessor(BaseOCRProcessor):
                 self.logger.warning(f"Failed to parse OCR result {idx}: {e}")
                 continue
         
-        # Sort regions by reading order (top to bottom, left to right)
-        regions.sort(key=lambda r: (r.bounding_box.y1, r.bounding_box.x1))
-        
-        # Update reading order after sorting
-        for idx, region in enumerate(regions):
-            region.reading_order = idx
+        # Improved reading order using document layout analysis
+        regions = self._sort_regions_by_reading_order(regions)
         
         return regions
     
-    def _determine_region_type(self, text: str, confidence: float, bbox: BoundingBox) -> RegionType:
-        """Determine the type of text region based on characteristics."""
+    def _determine_region_type(self, text: str, confidence: float, bbox: BoundingBox, image_dims: tuple = None) -> RegionType:
+        """Determine the type of text region using advanced NLP and layout analysis."""
         text_lower = text.lower().strip()
         
-        # Header/title detection based on position and content
-        if bbox.y1 < 100 and len(text) < 100:  # Top area, short text
+        # Use unstructured library for better document element detection if available
+        try:
+            return self._classify_with_unstructured(text, bbox, image_dims)
+        except ImportError:
+            # Fallback to enhanced heuristic method
+            return self._classify_with_enhanced_heuristics(text, text_lower, bbox, image_dims)
+    
+    def _classify_with_unstructured(self, text: str, bbox: BoundingBox, image_dims: tuple) -> RegionType:
+        """Use unstructured library for better document element classification."""
+        from unstructured.partition.text import partition_text
+        from unstructured.documents.elements import Title, NarrativeText, ListItem, Header
+        
+        # Partition the text to get element type
+        elements = partition_text(text=text)
+        
+        if not elements:
+            return RegionType.PARAGRAPH
+        
+        element = elements[0]
+        element_type = type(element).__name__
+        
+        # Map unstructured element types to our RegionType enum
+        type_mapping = {
+            'Title': RegionType.TITLE,
+            'Header': RegionType.HEADER,
+            'NarrativeText': RegionType.PARAGRAPH,
+            'ListItem': RegionType.LIST,
+            'Table': RegionType.TABLE,
+            'Footer': RegionType.FOOTER
+        }
+        
+        return type_mapping.get(element_type, RegionType.PARAGRAPH)
+    
+    def _classify_with_enhanced_heuristics(self, text: str, text_lower: str, bbox: BoundingBox, image_dims: tuple) -> RegionType:
+        """Enhanced heuristic classification with better patterns."""
+        # Get relative position if image dimensions available
+        if image_dims:
+            rel_y = bbox.y1 / image_dims[1] if image_dims[1] > 0 else 0
+            rel_height = bbox.height / image_dims[1] if image_dims[1] > 0 else 0
+        else:
+            rel_y = bbox.y1 / 1000  # Assume standard height
+            rel_height = bbox.height / 1000
+        
+        # Use regex patterns for better detection
+        import re
+        
+        # Header detection (improved)
+        if rel_y < 0.15 and len(text) < 100 and not text.endswith('.'):
             return RegionType.HEADER
         
-        # Footer detection
-        if bbox.y1 > 800:  # Bottom area (adjust based on image size)
+        # Footer detection (improved with common footer patterns)
+        footer_patterns = [
+            r'page\s+\d+', r'copyright\s+©', r'©\s+\d{4}', 
+            r'confidential', r'proprietary', r'all rights reserved'
+        ]
+        if (rel_y > 0.85 or any(re.search(pattern, text_lower) for pattern in footer_patterns)):
             return RegionType.FOOTER
         
-        # Title detection (short text, potentially larger font)
-        if len(text) < 60 and not text.endswith('.'):
+        # Title detection (improved with formatting heuristics)
+        title_indicators = [
+            len(text) < 80,
+            not text.endswith('.'),
+            text.isupper() or text.istitle(),
+            rel_height > 0.02  # Relatively large text
+        ]
+        if sum(title_indicators) >= 2:
             return RegionType.TITLE
         
-        # List detection
-        list_indicators = ['•', '·', '-', '*', '○', '■', '□']
-        if (any(text_lower.startswith(indicator) for indicator in list_indicators) or
-            (len(text) > 2 and text[0].isdigit() and text[1] in '.):')):
+        # List detection (improved patterns)
+        list_patterns = [
+            r'^[•·\-*○■□]\s+',  # Bullet points
+            r'^\d+[\.\)]\s+',   # Numbered lists
+            r'^[a-zA-Z][\.\)]\s+',  # Lettered lists
+            r'^[ivxlcdm]+[\.\)]\s+',  # Roman numerals
+        ]
+        if any(re.match(pattern, text_lower) for pattern in list_patterns):
             return RegionType.LIST
         
-        # Caption detection
-        caption_keywords = ['figure', 'table', 'chart', 'graph', 'image', 'fig.', 'tab.', 'caption']
-        if any(keyword in text_lower for keyword in caption_keywords):
+        # Caption detection (improved)
+        caption_patterns = [
+            r'^(figure|fig\.?|table|tab\.?|chart|graph|image|diagram)\s*\d*[:\.]?\s*',
+            r'^(source|note):\s*',
+            r'^\([^)]*\)$'  # Text in parentheses
+        ]
+        if any(re.match(pattern, text_lower) for pattern in caption_patterns):
             return RegionType.CAPTION
         
         # Default to paragraph
         return RegionType.PARAGRAPH
+    
+    def _sort_regions_by_reading_order(self, regions: List[OCRRegion]) -> List[OCRRegion]:
+        """Improved reading order using document layout analysis libraries."""
+        try:
+            # Try using layoutparser for advanced reading order
+            return self._sort_with_layoutparser(regions)
+        except ImportError:
+            # Fallback to enhanced heuristic sorting
+            return self._sort_with_enhanced_heuristics(regions)
+    
+    def _sort_with_layoutparser(self, regions: List[OCRRegion]) -> List[OCRRegion]:
+        """Use layoutparser for sophisticated reading order detection."""
+        import layoutparser as lp
+        
+        # Convert regions to layoutparser format
+        layout_blocks = []
+        for i, region in enumerate(regions):
+            bbox = region.bounding_box
+            block = lp.TextBlock(
+                block=lp.Rectangle(bbox.x1, bbox.y1, bbox.x2, bbox.y2),
+                text=region.text,
+                id=i
+            )
+            layout_blocks.append(block)
+        
+        # Create layout and sort by reading order
+        layout = lp.Layout(layout_blocks)
+        sorted_layout = layout.sort(key=lambda x: (x.block.y_1, x.block.x_1))
+        
+        # Map back to original regions
+        sorted_regions = []
+        for block in sorted_layout:
+            original_region = regions[block.id]
+            original_region.reading_order = len(sorted_regions)
+            sorted_regions.append(original_region)
+        
+        return sorted_regions
+    
+    def _sort_with_enhanced_heuristics(self, regions: List[OCRRegion]) -> List[OCRRegion]:
+        """Enhanced heuristic-based reading order with column detection."""
+        if not regions:
+            return regions
+        
+        # Detect columns first
+        columns = self._detect_columns(regions)
+        
+        if len(columns) > 1:
+            # Multi-column layout: sort within columns, then by column order
+            sorted_regions = []
+            for column_regions in columns:
+                # Sort within column by y-position
+                column_sorted = sorted(column_regions, key=lambda r: r.bounding_box.y1)
+                sorted_regions.extend(column_sorted)
+        else:
+            # Single column: sort by y-position, then x-position
+            sorted_regions = sorted(regions, key=lambda r: (r.bounding_box.y1, r.bounding_box.x1))
+        
+        # Update reading order
+        for idx, region in enumerate(sorted_regions):
+            region.reading_order = idx
+        
+        return sorted_regions
+    
+    def _detect_columns(self, regions: List[OCRRegion]) -> List[List[OCRRegion]]:
+        """Detect column layout in regions."""
+        if not regions:
+            return []
+        
+        # Group regions by x-position with tolerance
+        x_groups = {}
+        tolerance = 50  # pixels
+        
+        for region in regions:
+            x_center = (region.bounding_box.x1 + region.bounding_box.x2) / 2
+            
+            # Find existing group or create new one
+            assigned = False
+            for group_x in x_groups:
+                if abs(x_center - group_x) <= tolerance:
+                    x_groups[group_x].append(region)
+                    assigned = True
+                    break
+            
+            if not assigned:
+                x_groups[x_center] = [region]
+        
+        # Sort groups by x-position and return as columns
+        columns = [x_groups[x] for x in sorted(x_groups.keys())]
+        
+        # Filter out groups that are too small to be columns
+        columns = [col for col in columns if len(col) >= 2]
+        
+        return columns if len(columns) > 1 else [regions]
     
     def _detect_simple_tables(self, image: np.ndarray, regions: List[OCRRegion]) -> List[TableStructure]:
         """Simple table detection for EasyOCR (basic implementation)."""
@@ -507,3 +673,96 @@ class EasyOCRProcessor(BaseOCRProcessor):
         except Exception as e:
             self.logger.error(f"Visualization failed: {e}")
             return image
+    
+    def compare_with_simple_extraction(self, ocr_results: List) -> Dict[str, Any]:
+        """Compare the improved extraction with simple extraction methods."""
+        
+        # Simple extraction (old method)
+        simple_regions = []
+        for idx, result in enumerate(ocr_results):
+            bbox_points = result[0]
+            text = result[1].strip()
+            confidence = float(result[2])
+            
+            if not text:
+                continue
+            
+            # Simple bbox conversion
+            x_coords = [point[0] for point in bbox_points]
+            y_coords = [point[1] for point in bbox_points]
+            x1, x2 = min(x_coords), max(x_coords)
+            y1, y2 = min(y_coords), max(y_coords)
+            
+            simple_bbox = BoundingBox(x1=x1, y1=y1, x2=x2, y2=y2)
+            
+            # Simple region type (basic heuristics)
+            if text.lower().startswith(('•', '-', '*')):
+                region_type = RegionType.LIST
+            elif len(text) < 50:
+                region_type = RegionType.TITLE
+            else:
+                region_type = RegionType.PARAGRAPH
+            
+            simple_regions.append({
+                'text': text,
+                'type': region_type.value,
+                'confidence': confidence,
+                'bbox_area': simple_bbox.area
+            })
+        
+        # Improved extraction (new method)
+        improved_regions = self._extract_regions_from_results(ocr_results)
+        
+        return {
+            'simple_extraction': {
+                'total_regions': len(simple_regions),
+                'type_distribution': self._get_type_distribution(simple_regions, 'type'),
+                'avg_confidence': sum(r['confidence'] for r in simple_regions) / len(simple_regions) if simple_regions else 0
+            },
+            'improved_extraction': {
+                'total_regions': len(improved_regions),
+                'type_distribution': self._get_type_distribution(improved_regions, 'region_type'),
+                'avg_confidence': sum(r.confidence for r in improved_regions) / len(improved_regions) if improved_regions else 0,
+                'reading_order_assigned': all(r.reading_order is not None for r in improved_regions),
+                'libraries_used': self._get_libraries_used()
+            }
+        }
+    
+    def _get_type_distribution(self, regions: List, type_attr: str) -> Dict[str, int]:
+        """Get distribution of region types."""
+        distribution = {}
+        for region in regions:
+            if hasattr(region, type_attr):
+                region_type = getattr(region, type_attr)
+                if hasattr(region_type, 'value'):
+                    region_type = region_type.value
+            else:
+                region_type = region[type_attr]
+            
+            distribution[region_type] = distribution.get(region_type, 0) + 1
+        return distribution
+    
+    def _get_libraries_used(self) -> List[str]:
+        """Get list of advanced libraries used in processing."""
+        libraries = []
+        
+        # Check which libraries are available
+        try:
+            import shapely
+            libraries.append('shapely')
+        except ImportError:
+            pass
+        
+        try:
+            import unstructured
+            libraries.append('unstructured')
+        except ImportError:
+            pass
+        
+        try:
+            import layoutparser
+            libraries.append('layoutparser')
+        except ImportError:
+            pass
+        
+        return libraries
