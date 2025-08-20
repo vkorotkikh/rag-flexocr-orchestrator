@@ -1,0 +1,40 @@
+# Required API Keys
+OPENAI_API_KEY=your_openai_api_key_here
+PINECONE_API_KEY=your_pinecone_api_key_here
+PINECONE_ENVIRONMENT=your_pinecone_environment
+PINECONE_INDEX_NAME=ocr-rag-index
+
+# Optional Cloud OCR Services
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+AWS_REGION=us-east-1
+
+GOOGLE_APPLICATION_CREDENTIALS=path/to/google/credentials.json
+
+AZURE_COMPUTER_VISION_SUBSCRIPTION_KEY=your_azure_key
+AZURE_COMPUTER_VISION_ENDPOINT=your_azure_endpoint
+
+# Optional Reranking
+COHERE_API_KEY=your_cohere_api_key
+
+# OCR Configuration
+DEFAULT_OCR_ENGINE=easyocr
+ENABLE_PREPROCESSING=true
+DEFAULT_CONFIDENCE_THRESHOLD=0.7
+MAX_CONCURRENT_PROCESSING=3
+
+# Vector Store Configuration
+VECTOR_STORE_TYPE=pinecone
+EMBEDDING_MODEL=text-embedding-3-small
+CHUNK_SIZE=1000
+CHUNK_OVERLAP=200
+
+# Quality Settings
+MIN_OCR_CONFIDENCE=0.5
+ENABLE_QUALITY_ASSESSMENT=true
+AUTO_ENHANCE_IMAGES=true
+
+# Logging
+LOG_LEVEL=INFO
+ENABLE_OCR_CACHE=true
+CACHE_DURATION_HOURS=24

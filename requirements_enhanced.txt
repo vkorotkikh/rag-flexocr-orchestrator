@@ -1,0 +1,189 @@
+# Enhanced Requirements for RAG FlexOCR Orchestrator
+# This file includes all advanced libraries for the improved implementation
+
+# ====================
+# Core AI and ML
+# ====================
+openai>=1.50.0
+langchain>=0.1.0
+langchain-openai>=0.1.0
+langchain-community>=0.0.20
+langchain-experimental>=0.0.40
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# ====================
+# Advanced OCR Models
+# ====================
+# Transformer-based OCR
+transformers>=4.35.0
+torch>=2.0.0
+torchvision>=0.15.0
+datasets>=2.14.0
+accelerate>=0.24.0  # For model optimization
+
+# Traditional OCR (kept for comparison)
+pytesseract>=0.3.10
+easyocr>=1.7.0
+
+# ====================
+# Document Processing
+# ====================
+# Unstructured.io for advanced document parsing
+unstructured[pdf,image]>=0.10.30
+unstructured-inference>=0.7.0
+python-magic>=0.4.27
+python-magic-bin>=0.4.14  # For Windows
+pdf2image>=1.16.0
+pdfplumber>=0.10.0
+pymupdf>=1.23.0
+
+# Layout detection
+layoutparser[detectron2]>=0.3.4
+detectron2>=0.6  # Note: May require separate installation
+opencv-python>=4.8.0
+
+# ====================
+# Advanced Image Processing
+# ====================
+pillow>=10.0.0
+pillow-heif>=0.13.0  # For HEIF/HEIC support
+PIL-SIMD>=9.0.0  # Faster PIL operations (optional)
+scikit-image>=0.21.0
+numpy>=1.24.0
+scipy>=1.11.0
+matplotlib>=3.7.0
+
+# ====================
+# NLP and Text Analysis
+# ====================
+# spaCy and models
+spacy>=3.7.0
+# Download models separately:
+# python -m spacy download en_core_web_sm
+# python -m spacy download en_core_web_lg
+
+# Text quality assessment
+textstat>=0.7.3
+language-tool-python>=2.7.1
+nltk>=3.8.0
+sentence-transformers>=2.2.0
+
+# Language detection
+langdetect>=1.0.9
+polyglot>=16.7.4
+pycld2>=0.41
+
+# ====================
+# Vector Databases
+# ====================
+pinecone-client>=3.0.0
+weaviate-client>=4.4.0
+chromadb>=0.4.15
+qdrant-client>=1.7.0
+
+# ====================
+# Performance Optimization
+# ====================
+# Distributed processing
+ray[default]>=2.8.0
+dask[complete]>=2023.10.0  # Alternative to Ray
+
+# Caching
+redis>=5.0.0
+aiocache[redis]>=0.12.0
+diskcache>=5.6.0  # Disk-based caching
+
+# Async operations
+aiofiles>=23.0.0
+asyncio-throttle>=1.0.2
+httpx>=0.25.0
+
+# Parallel processing
+joblib>=1.3.0
+multiprocess>=0.70.15
+
+# ====================
+# Monitoring and Logging
+# ====================
+prometheus-client>=0.19.0
+grafana-api>=1.0.3
+loguru>=0.7.0
+structlog>=23.2.0  # Structured logging
+python-json-logger>=2.0.7
+
+# ====================
+# Cloud OCR Services (Optional)
+# ====================
+boto3>=1.28.0  # AWS Textract
+google-cloud-vision>=3.4.0  # Google Vision
+azure-cognitiveservices-vision-computervision>=0.9.0  # Azure
+
+# ====================
+# Advanced Chunking
+# ====================
+tiktoken>=0.5.0  # OpenAI tokenizer
+sentencepiece>=0.1.99  # Google tokenizer
+
+# ====================
+# Utilities
+# ====================
+python-dotenv>=1.0.0
+PyYAML>=6.0.0
+click>=8.1.0  # CLI interface
+rich>=13.7.0  # Rich terminal output
+tqdm>=4.65.0  # Progress bars
+humanize>=4.9.0  # Human-readable formats
+
+# ====================
+# Development and Testing
+# ====================
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
+black>=23.0.0
+isort>=5.12.0
+mypy>=1.5.0
+flake8>=6.1.0
+pre-commit>=3.5.0
+
+# ====================
+# Optional Advanced Features
+# ====================
+# Document format support
+python-docx>=0.8.11
+openpyxl>=3.1.0
+xlrd>=2.0.1
+python-pptx>=0.6.23
+markdown>=3.5.0
+beautifulsoup4>=4.12.0
+
+# OCR post-processing
+rapidfuzz>=3.5.0  # Fuzzy string matching
+Levenshtein>=0.23.0  # String distance metrics
+
+# Advanced ML
+xgboost>=2.0.0  # For quality scoring models
+lightgbm>=4.1.0  # Alternative gradient boosting
+
+# ====================
+# Installation Notes
+# ====================
+# 1. Some packages may require system dependencies:
+#    - Tesseract: apt-get install tesseract-ocr
+#    - Poppler: apt-get install poppler-utils
+#    - Redis: apt-get install redis-server
+#
+# 2. For GPU support with PyTorch:
+#    pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+#
+# 3. Detectron2 installation:
+#    python -m pip install 'git+https://github.com/facebookresearch/detectron2.git'
+#
+# 4. Download spaCy models:
+#    python -m spacy download en_core_web_sm
+#    python -m spacy download en_core_web_lg
+#
+# 5. For Apple Silicon (M1/M2):
+#    Some packages may need special installation procedures
