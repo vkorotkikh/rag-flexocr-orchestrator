@@ -16,6 +16,9 @@ class OCREngine(str, Enum):
     AWS_TEXTRACT = "aws_textract"
     GOOGLE_VISION = "google_vision"
     AZURE_VISION = "azure_vision"
+    TROCR = "trocr"  # Microsoft's Transformer-based OCR
+    LAYOUTLMV3 = "layoutlmv3"  # Microsoft's LayoutLMv3 for document understanding
+    PADDLEOCR = "paddleocr"  # PaddlePaddle OCR
 
 
 class RegionType(str, Enum):
