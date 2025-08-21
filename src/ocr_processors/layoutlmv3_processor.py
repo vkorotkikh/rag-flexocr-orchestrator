@@ -49,6 +49,31 @@ class LayoutLMv3Processor(BaseOCRProcessor):
     """
     Advanced document understanding processor using Microsoft's LayoutLMv3.
     
+    LayoutLMv3 is a pretrained multimodal transformer model that achieves SOTA performance in Document AI tasks including
+    form understanding, receipt understanding, and document visual question answering. 
+    
+    LayoutLMv3 is good at the following tasks:
+    - Extract text with layout awareness
+    - Classify document regions (headers, paragraphs, tables, etc.)
+    - Understand form fields and their relationships
+    - Answer questions about documents
+    Cons:
+    - Large model size (1.5GB)
+    - Long inference time (10s per page)
+    - Requires GPU/MPS for inference
+    
+    LayoutLMv3 is a pretrained multimodal transformer model that achieves SOTA performance in Document AI tasks including
+    form understanding, receipt understanding, and document visual question answering. 
+    
+    
+    LayoutLMv3 combines text, layout, and image features for superior document understanding. It can:
+    - Extract text with layout awareness
+    - Classify document regions (headers, paragraphs, tables, etc.)
+    - Understand form fields and their relationships
+    - Answer questions about documents
+    
+    
+    
     LayoutLMv3 combines text, layout, and image features for superior
     document understanding. It can:
     - Extract text with layout awareness

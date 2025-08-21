@@ -14,14 +14,15 @@ from PIL import Image
 import torch
 from pathlib import Path
 
-from transformers import (
-    TrOCRProcessor,
-    VisionEncoderDecoderModel,
-    AutoProcessor,
-    AutoModel
-)
+# from transformers import (
+#     TrOCRProcessor,
+#     VisionEncoderDecoderModel,
+#     AutoProcessor,
+#     AutoModel
+# )
+from transformers import TrOCRProcessor, VisionEncoderDecoderModel, AutoProcessor, AutoModel
 from transformers.utils import logging as transformers_logging
-
+j
 from .base import BaseOCRProcessor
 from ..models import OCRResult, OCRRegion, BoundingBox, RegionType, OCREngine
 
